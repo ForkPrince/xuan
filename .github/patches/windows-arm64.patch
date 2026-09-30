@@ -1,0 +1,102 @@
+diff --git a/scripts/check-packages.py b/scripts/check-packages.py
+index 3ec5063..a8a6c0a 100755
+--- a/scripts/check-packages.py
++++ b/scripts/check-packages.py
+@@ -24,6 +24,16 @@ NAME = f"xuan-{VERSION}-linux-{platform.machine()}"
+ SOURCE_NAME = f"xuan-{VERSION}-source"
+ 
+ 
++def windows_architecture():
++    """Return the Windows package name suffix and PE machine for this host."""
++    machine = platform.machine().lower()
++    if machine in ("amd64", "x86_64"):
++        return "x86_64", 0x8664
++    if machine in ("arm64", "aarch64"):
++        return "arm64", 0xAA64
++    raise ValueError(f"Unsupported Windows host architecture: {platform.machine()}")
++
++
+ def check_checksum(package):
+     digest, filename = package.with_name(package.name + ".sha256").read_text().split()
+     assert filename == package.name, f"Incorrect checksum filename: {filename}"
+@@ -116,7 +126,10 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+         data = executable.read_bytes()
+         assert data[:2] == b"MZ", "Not a Windows executable"
+         pe = int.from_bytes(data[0x3C:0x40], "little")
+-        assert data[pe : pe + 6] == b"PE\0\0\x64\x86", "Not an x86_64 PE executable"
++        architecture, machine = windows_architecture()
++        assert data[pe : pe + 6] == b"PE\0\0" + machine.to_bytes(2, "little"), (
++            f"Expected a {architecture} PE executable"
++        )
+         assert int.from_bytes(data[pe + 92 : pe + 94], "little") == 2, (
+             "Expected a GUI executable"
+         )
+@@ -357,7 +370,8 @@ def main():
+             check_appimage(temporary)
+             return
+         if args.windows:
+-            name = f"xuan-{VERSION}-windows-x86_64"
++            architecture, _ = windows_architecture()
++            name = f"xuan-{VERSION}-windows-{architecture}"
+             package = ROOT / "dist" / f"{name}.zip"
+             check_checksum(package)
+             with zipfile.ZipFile(package) as archive:
+diff --git a/scripts/package-windows.py b/scripts/package-windows.py
+index 89a37fd..1739db4 100755
+--- a/scripts/package-windows.py
++++ b/scripts/package-windows.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Build a portable Windows x86_64 ZIP and matching rebuildable sources."""
++"""Build a portable Windows ZIP for the host architecture and matching rebuildable sources."""
+ 
+ import os
+ import platform
+@@ -13,18 +13,25 @@ import zipfile
+ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parent.parent
+-TARGET = "x86_64-pc-windows-msvc"
++ARCHITECTURES = {
++    "amd64": ("x86_64", "x86_64-pc-windows-msvc"),
++    "x86_64": ("x86_64", "x86_64-pc-windows-msvc"),
++    "arm64": ("arm64", "aarch64-pc-windows-msvc"),
++    "aarch64": ("arm64", "aarch64-pc-windows-msvc"),
++}
+ 
+ 
+ def main():
+-    if sys.platform != "win32" or platform.machine().lower() not in ("amd64", "x86_64"):
++    machine = platform.machine().lower()
++    if sys.platform != "win32" or machine not in ARCHITECTURES:
+         raise SystemExit(
+-            "Windows packaging requires a native x86_64 Windows host with MSVC."
++            "Windows packaging requires a native x86_64 or ARM64 Windows host with MSVC."
+         )
++    architecture, target = ARCHITECTURES[machine]
+     version = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))[
+         "package"
+     ]["version"]
+-    name = f"xuan-{version}-windows-x86_64"
++    name = f"xuan-{version}-windows-{architecture}"
+     destination = ROOT / "dist"
+     destination.mkdir(exist_ok=True)
+ 
+@@ -43,7 +50,7 @@ def main():
+             "--release",
+             "--locked",
+             "--target",
+-            TARGET,
++            target,
+             "--target-dir",
+             str(target_directory),
+         ],
+@@ -55,7 +62,7 @@ def main():
+     with tempfile.TemporaryDirectory(prefix=".windows-", dir=destination) as directory:
+         stage = Path(directory) / name
+         stage.mkdir()
+-        shutil.copy2(target_directory / TARGET / "release/xuan.exe", stage / "xuan.exe")
++        shutil.copy2(target_directory / target / "release/xuan.exe", stage / "xuan.exe")
+         licenses = stage / "share/licenses/xuan"
+         licenses.mkdir(parents=True)
+         for filename in (
