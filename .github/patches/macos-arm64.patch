@@ -42,7 +42,7 @@ index 6e6c6f5..69d4341 100644
  pollster = "0.4"
  
 diff --git a/scripts/check-packages.py b/scripts/check-packages.py
-index a8a6c0a..5ed8ff5 100755
+index a8a6c0a..6bd094a 100755
 --- a/scripts/check-packages.py
 +++ b/scripts/check-packages.py
 @@ -34,6 +34,16 @@ def windows_architecture():
@@ -106,6 +106,15 @@ index a8a6c0a..5ed8ff5 100755
      else:
          assert executable.stat().st_mode & 0o777 == 0o755
          if maximum := os.environ.get("XUAN_MAX_GLIBC"):
+@@ -162,7 +179,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+     source_notice = (documentation / "SOURCES.md").read_text(encoding="utf-8")
+     assert f"/releases/download/v{VERSION}/{SOURCE_NAME}.tar.gz" in source_notice
+     assert f"/releases/download/v{VERSION}/{SOURCE_NAME}.tar.gz.sha256" in source_notice
+-    if not windows:
++    if not windows and not macos:
+         subprocess.run(
+             [
+                 "desktop-file-validate",
 @@ -170,7 +187,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
              ],
              check=True,
@@ -298,10 +307,21 @@ index 4d2f7d0..f8ac3a4 100755
  xuan_name="xuan-${xuan_version}-linux-$(uname -m)"
  mkdir -p dist
 diff --git a/src/app/tablet/mod.rs b/src/app/tablet/mod.rs
-index 29ab5ea..ecd6df7 100644
+index 29ab5ea..d78ddac 100644
 --- a/src/app/tablet/mod.rs
 +++ b/src/app/tablet/mod.rs
-@@ -148,6 +148,12 @@ impl TabletInput {
+@@ -14,7 +14,9 @@ use std::thread::JoinHandle;
+ use egui::{Event, PointerButton, Pos2};
+ #[cfg(target_os = "linux")]
+ use raw_window_handle::RawDisplayHandle;
+-use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
++use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
++#[cfg(any(target_os = "linux", windows))]
++use raw_window_handle::RawWindowHandle;
+ 
+ const BUTTONS: [PointerButton; 3] = [
+     PointerButton::Primary,
+@@ -148,6 +150,12 @@ impl TabletInput {
                  }
              }
          }
