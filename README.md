@@ -1,3 +1,3 @@
 # xuan (ARM builds)
 
-Builds for Windows ARM and Linux aarch64.
+Builds for Windows ARM, Linux aarch64, and macOS arm64.
