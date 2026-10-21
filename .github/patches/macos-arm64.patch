@@ -42,7 +42,7 @@ index 6e6c6f5..69d4341 100644
  pollster = "0.4"
  
 diff --git a/scripts/check-packages.py b/scripts/check-packages.py
-index a8a6c0a..6bd094a 100755
+index a8a6c0a..57510a6 100755
 --- a/scripts/check-packages.py
 +++ b/scripts/check-packages.py
 @@ -34,6 +34,16 @@ def windows_architecture():
@@ -71,19 +71,21 @@ index a8a6c0a..6bd094a 100755
      expected = {
          "share/licenses/xuan/LICENSE",
          "share/licenses/xuan/rawler-LGPL-2.1.txt",
-@@ -52,9 +62,9 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+@@ -52,9 +62,11 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
          "share/licenses/xuan/egui-winit/LICENSE-MIT",
          "share/licenses/xuan/egui-winit/LICENSE-APACHE",
      }
 -    executable = prefix / ("xuan.exe" if windows else "bin/xuan")
 +    executable = prefix / ("xuan.exe" if windows else "xuan" if macos else "bin/xuan")
++    if macos:
++        executable.chmod(0o755)
      expected.add(executable.relative_to(prefix).as_posix())
 -    if not windows:
 +    if not windows and not macos:
          expected.update(
              {
                  "share/applications/me.silverl.xuan.desktop",
-@@ -72,7 +82,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+@@ -72,7 +84,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
      ]
      expected.update(f"share/doc/xuan/{name}" for name in documents)
      icons = (
@@ -92,7 +94,7 @@ index a8a6c0a..6bd094a 100755
      )
      expected.update(
          f"share/icons/{path.relative_to(ROOT / 'assets/icons').as_posix()}"
-@@ -133,6 +143,13 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+@@ -133,6 +145,13 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
          assert int.from_bytes(data[pe + 92 : pe + 94], "little") == 2, (
              "Expected a GUI executable"
          )
@@ -106,7 +108,7 @@ index a8a6c0a..6bd094a 100755
      else:
          assert executable.stat().st_mode & 0o777 == 0o755
          if maximum := os.environ.get("XUAN_MAX_GLIBC"):
-@@ -162,7 +179,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+@@ -162,7 +181,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
      source_notice = (documentation / "SOURCES.md").read_text(encoding="utf-8")
      assert f"/releases/download/v{VERSION}/{SOURCE_NAME}.tar.gz" in source_notice
      assert f"/releases/download/v{VERSION}/{SOURCE_NAME}.tar.gz.sha256" in source_notice
@@ -115,7 +117,7 @@ index a8a6c0a..6bd094a 100755
          subprocess.run(
              [
                  "desktop-file-validate",
-@@ -170,7 +187,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
+@@ -170,7 +189,7 @@ def check_files(prefix, portable=False, windows=False, appimage=False):
              ],
              check=True,
          )
@@ -124,7 +126,7 @@ index a8a6c0a..6bd094a 100755
          actual_version = subprocess.check_output(
              [prefix.parent / "AppRun" if appimage else executable, "--version"],
              text=True,
-@@ -229,7 +246,6 @@ def check_source(temporary):
+@@ -229,7 +248,6 @@ def check_source(temporary):
              "cargo",
              "metadata",
              "--offline",
@@ -132,7 +134,7 @@ index a8a6c0a..6bd094a 100755
              "--format-version",
              "1",
              "--filter-platform",
-@@ -358,6 +374,9 @@ def main():
+@@ -358,6 +376,9 @@ def main():
      formats.add_argument(
          "--windows", action="store_true", default=sys.platform == "win32"
      )
@@ -142,7 +144,7 @@ index a8a6c0a..6bd094a 100755
      formats.add_argument(
          "--appimage", action="store_true", help="check only AppImage and sources"
      )
-@@ -382,6 +401,19 @@ def main():
+@@ -382,6 +403,19 @@ def main():
                  f"Verified {package.name}: executable, runtime files, documentation, checksums"
              )
              return
