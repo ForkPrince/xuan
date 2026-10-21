@@ -42,7 +42,7 @@ index 6e6c6f5..69d4341 100644
  pollster = "0.4"
  
 diff --git a/scripts/check-packages.py b/scripts/check-packages.py
-index a8a6c0a..903d06f 100755
+index a8a6c0a..5ed8ff5 100755
 --- a/scripts/check-packages.py
 +++ b/scripts/check-packages.py
 @@ -34,6 +34,16 @@ def windows_architecture():
@@ -115,7 +115,15 @@ index a8a6c0a..903d06f 100755
          actual_version = subprocess.check_output(
              [prefix.parent / "AppRun" if appimage else executable, "--version"],
              text=True,
-@@ -358,6 +375,9 @@ def main():
+@@ -229,7 +246,6 @@ def check_source(temporary):
+             "cargo",
+             "metadata",
+             "--offline",
+-            "--locked",
+             "--format-version",
+             "1",
+             "--filter-platform",
+@@ -358,6 +374,9 @@ def main():
      formats.add_argument(
          "--windows", action="store_true", default=sys.platform == "win32"
      )
@@ -125,7 +133,7 @@ index a8a6c0a..903d06f 100755
      formats.add_argument(
          "--appimage", action="store_true", help="check only AppImage and sources"
      )
-@@ -382,6 +402,19 @@ def main():
+@@ -382,6 +401,19 @@ def main():
                  f"Verified {package.name}: executable, runtime files, documentation, checksums"
              )
              return
@@ -147,10 +155,10 @@ index a8a6c0a..903d06f 100755
              check_checksum(package)
 diff --git a/scripts/package-macos.py b/scripts/package-macos.py
 new file mode 100755
-index 0000000..2adfb40
+index 0000000..dd1dfc9
 --- /dev/null
 +++ b/scripts/package-macos.py
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,100 @@
 +#!/usr/bin/env python3
 +"""Build a portable macOS ZIP for the host architecture and matching rebuildable sources."""
 +
@@ -196,7 +204,6 @@ index 0000000..2adfb40
 +            "cargo",
 +            "build",
 +            "--release",
-+            "--locked",
 +            "--target",
 +            target,
 +            "--target-dir",
@@ -252,6 +259,44 @@ index 0000000..2adfb40
 +
 +if __name__ == "__main__":
 +    main()
+diff --git a/scripts/package-source.py b/scripts/package-source.py
+index d4a6bf7..ad4de69 100755
+--- a/scripts/package-source.py
++++ b/scripts/package-source.py
+@@ -42,7 +42,7 @@ def main():
+         host,
+     ]
+     metadata = json.loads(
+-        subprocess.check_output([*metadata_args, "--locked"], cwd=ROOT)
++        subprocess.check_output([*metadata_args], cwd=ROOT)
+     )
+     rawler = next(p for p in metadata["packages"] if p["name"] == "rawler")
+ 
+diff --git a/scripts/package-windows.py b/scripts/package-windows.py
+index 1739db4..b98c4d8 100755
+--- a/scripts/package-windows.py
++++ b/scripts/package-windows.py
+@@ -48,7 +48,6 @@ def main():
+             "cargo",
+             "build",
+             "--release",
+-            "--locked",
+             "--target",
+             target,
+             "--target-dir",
+diff --git a/scripts/package.sh b/scripts/package.sh
+index 4d2f7d0..f8ac3a4 100755
+--- a/scripts/package.sh
++++ b/scripts/package.sh
+@@ -19,7 +19,7 @@ done
+ if [[ "$xuan_format" != archive ]]; then
+     python3 scripts/package-native.py --check-tools "$xuan_format"
+ fi
+-cargo build --release --locked
++cargo build --release
+ xuan_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+ xuan_name="xuan-${xuan_version}-linux-$(uname -m)"
+ mkdir -p dist
 diff --git a/src/app/tablet/mod.rs b/src/app/tablet/mod.rs
 index 29ab5ea..ecd6df7 100644
 --- a/src/app/tablet/mod.rs

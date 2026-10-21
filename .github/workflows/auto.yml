@@ -120,7 +120,7 @@ jobs:
           rustup toolchain install stable --profile minimal
           rustup default stable
       - name: Fetch dependencies
-        run: cargo fetch --locked
+        run: cargo fetch
       - name: Package
         run: scripts/package.sh all
       - name: Verify distribution packages
@@ -214,7 +214,7 @@ jobs:
           rustup target add aarch64-pc-windows-msvc
       - name: Fetch dependencies
         if: steps.support.outputs.supported == 'true'
-        run: cargo fetch --locked
+        run: cargo fetch
       - name: Package
         if: steps.support.outputs.supported == 'true'
         run: python scripts/package-windows.py
@@ -299,7 +299,7 @@ jobs:
           rustup default stable
       - name: Fetch dependencies
         if: steps.support.outputs.supported == 'true'
-        run: cargo fetch --locked
+        run: cargo fetch
       - name: Package
         if: steps.support.outputs.supported == 'true'
         run: python scripts/package-macos.py
