@@ -42,7 +42,7 @@ index 6e6c6f5..69d4341 100644
  pollster = "0.4"
  
 diff --git a/scripts/check-packages.py b/scripts/check-packages.py
-index a8a6c0a..57510a6 100755
+index a8a6c0a..663ef56 100755
 --- a/scripts/check-packages.py
 +++ b/scripts/check-packages.py
 @@ -34,6 +34,16 @@ def windows_architecture():
@@ -144,7 +144,7 @@ index a8a6c0a..57510a6 100755
      formats.add_argument(
          "--appimage", action="store_true", help="check only AppImage and sources"
      )
-@@ -382,6 +403,19 @@ def main():
+@@ -382,6 +403,30 @@ def main():
                  f"Verified {package.name}: executable, runtime files, documentation, checksums"
              )
              return
@@ -156,9 +156,20 @@ index a8a6c0a..57510a6 100755
 +            with zipfile.ZipFile(package) as archive:
 +                assert archive.testzip() is None, "Corrupt macOS ZIP"
 +                archive.extractall(temporary / "macos")
-+            check_files(temporary / "macos" / name, macos=True)
++            app = temporary / "macos" / name / "Xuan.app"
++            assert app.is_dir(), f"Missing app bundle: {app}"
++            assert (app / "Contents/Info.plist").is_file()
++            executable = app / "Contents/MacOS/xuan"
++            assert executable.is_file()
++            executable.chmod(0o755)
++            actual_version = subprocess.check_output(
++                [executable, "--version"], text=True, timeout=30
++            ).strip()
++            assert actual_version == f"xuan {VERSION}", actual_version
++            assert (app / "Contents/Resources/share/licenses/xuan/LICENSE").is_file()
++            assert (app / "Contents/Resources/share/doc/xuan/README.md").is_file()
 +            print(
-+                f"Verified {package.name}: executable, runtime files, documentation, checksums"
++                f"Verified {package.name}: app bundle, executable, runtime files, documentation, checksums"
 +            )
 +            return
          for extension in ("tar.gz", "deb", "rpm"):
@@ -166,12 +177,12 @@ index a8a6c0a..57510a6 100755
              check_checksum(package)
 diff --git a/scripts/package-macos.py b/scripts/package-macos.py
 new file mode 100755
-index 0000000..dd1dfc9
+index 0000000..5cffe9c
 --- /dev/null
 +++ b/scripts/package-macos.py
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,132 @@
 +#!/usr/bin/env python3
-+"""Build a portable macOS ZIP for the host architecture and matching rebuildable sources."""
++"""Build a macOS .app bundle for the host architecture and matching rebuildable sources."""
 +
 +import os
 +import platform
@@ -196,9 +207,7 @@ index 0000000..dd1dfc9
 +def main():
 +    machine = platform.machine().lower()
 +    if sys.platform != "darwin" or machine not in ARCHITECTURES:
-+        raise SystemExit(
-+            "macOS packaging requires a native macOS host."
-+        )
++        raise SystemExit("macOS packaging requires a native macOS host.")
 +    architecture, target = ARCHITECTURES[machine]
 +    version = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))[
 +        "package"
@@ -228,9 +237,16 @@ index 0000000..dd1dfc9
 +    with tempfile.TemporaryDirectory(prefix=".macos-", dir=destination) as directory:
 +        stage = Path(directory) / name
 +        stage.mkdir()
-+        shutil.copy2(target_directory / target / "release/xuan", stage / "xuan")
-+        (stage / "xuan").chmod(0o755)
-+        licenses = stage / "share/licenses/xuan"
++        app = stage / "Xuan.app"
++        contents = app / "Contents"
++        macos_dir = contents / "MacOS"
++        resources = contents / "Resources"
++        macos_dir.mkdir(parents=True)
++        resources.mkdir(parents=True)
++        binary = macos_dir / "xuan"
++        shutil.copy2(target_directory / target / "release/xuan", binary)
++        binary.chmod(0o755)
++        licenses = resources / "share/licenses/xuan"
 +        licenses.mkdir(parents=True)
 +        for filename in (
 +            "LICENSE",
@@ -251,16 +267,43 @@ index 0000000..dd1dfc9
 +            [
 +                sys.executable,
 +                str(ROOT / "scripts/package-docs.py"),
-+                str(stage / "share/doc/xuan"),
++                str(resources / "share/doc/xuan"),
 +                version,
 +            ],
 +            check=True,
 +        )
++        info_plist = contents / "Info.plist"
++        info_plist.write_text(
++            f"""<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++    <key>CFBundleName</key>
++    <string>Xuan</string>
++    <key>CFBundleDisplayName</key>
++    <string>Xuan</string>
++    <key>CFBundleIdentifier</key>
++    <string>com.silverl.xuan</string>
++    <key>CFBundleVersion</key>
++    <string>{version}</string>
++    <key>CFBundleShortVersionString</key>
++    <string>{version}</string>
++    <key>CFBundleExecutable</key>
++    <string>xuan</string>
++    <key>CFBundlePackageType</key>
++    <string>APPL</string>
++    <key>NSHighResolutionCapable</key>
++    <true/>
++</dict>
++</plist>
++""",
++            encoding="utf-8",
++        )
 +        package = destination / f"{name}.zip"
 +        with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-+            for path in sorted(stage.rglob("*")):
++            for path in sorted(app.rglob("*")):
 +                if path.is_file():
-+                    archive.write(path, path.relative_to(stage.parent).as_posix())
++                    archive.write(path, path.relative_to(stage).as_posix())
 +
 +    source_packager = runpy.run_path(str(ROOT / "scripts/package-source.py"))
 +    source_packager["write_checksum"](package)
