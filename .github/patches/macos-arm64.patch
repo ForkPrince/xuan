@@ -177,7 +177,7 @@ index a8a6c0a..663ef56 100755
              check_checksum(package)
 diff --git a/scripts/package-macos.py b/scripts/package-macos.py
 new file mode 100755
-index 0000000..5cffe9c
+index 0000000..a711770
 --- /dev/null
 +++ b/scripts/package-macos.py
 @@ -0,0 +1,132 @@
@@ -303,7 +303,7 @@ index 0000000..5cffe9c
 +        with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
 +            for path in sorted(app.rglob("*")):
 +                if path.is_file():
-+                    archive.write(path, path.relative_to(stage).as_posix())
++                    archive.write(path, path.relative_to(stage.parent).as_posix())
 +
 +    source_packager = runpy.run_path(str(ROOT / "scripts/package-source.py"))
 +    source_packager["write_checksum"](package)
